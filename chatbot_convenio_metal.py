@@ -2,6 +2,8 @@ from os import getenv
 from dotenv import load_dotenv
 import gradio as gr
 import glob
+import datetime
+import requests
 
 # Importaciones de LangChain
 from langchain_core.vectorstores import InMemoryVectorStore
@@ -44,6 +46,24 @@ splits = text_splitter.split_documents(docs)
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
 vector_store = InMemoryVectorStore(embedding=embeddings)
 vector_store.add_documents(splits)
+
+# 4.1. Registramos interacción con HELICONE
+
+HELICONE_API_URL = "https://api.helicone.ai/v1/logs"
+HELICONE_API_KEY = getenv("HELICONE_API_KEY")
+
+def log_to_helicone(user_message, bot_response):
+    headers = {"Authorization": f"Bearer {HELICONE_API_KEY}", "Content-Type": "application/json"}
+    data = {
+    "user": "chatbot_user",
+    "input": user_message,
+    "output": bot_response,
+    "timestamp": str(datetime.datetime.now())
+    }
+try:
+    requests.post(HELICONE_API_URL, json=data, headers=headers)
+except Exception as e:
+    print(f"Error al enviar datos a Helicone: {e}")
 
 
 # 5. Definir herramientas para el agente
@@ -125,6 +145,7 @@ def chatbot(message, history):
         )
         respuesta = llm.invoke(final_prompt).content
 
+    log_to_helicone(message, respuesta)
     yield respuesta
 
 
